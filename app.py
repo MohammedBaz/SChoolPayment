@@ -32,7 +32,7 @@ def deposit_funds(student_id, amount, payment_method, transaction_id):
 
 
 # --- PayTabs Configuration ---
-profile_id = st.secrets["profile_id"]  # Replace with your actual Profile ID
+profile_id = 116284  # Replace with your actual Profile ID
 server_key = st.secrets["server_key"]  # Replace with your actual Server Key
 paytabs_api_url = "https://secure.paytabs.sa/payment/request"
 
