@@ -1,160 +1,126 @@
 import streamlit as st
-import sqlite3
 import requests
+import pandas as pd
 from datetime import datetime
-import random
 
-# Database setup
-def init_db():
-    conn = sqlite3.connect("school_meal_system.db")
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS students (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        name TEXT NOT NULL,
-                        balance REAL NOT NULL DEFAULT 0.0)''')
-    cursor.execute('''CREATE TABLE IF NOT EXISTS transactions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        student_id INTEGER NOT NULL,
-                        amount REAL NOT NULL,
-                        type TEXT NOT NULL,
-                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY(student_id) REFERENCES students(id))''')
-    conn.commit()
-    conn.close()
+# --- Data Storage (In-memory for simulation) ---
+student_data = {
+    "12345": {"name": "John Doe", "card_balance": 100.00},
+    "67890": {"name": "Jane Smith", "card_balance": 50.00},
+    # ... more student data
+}
+transaction_history = []  # List to store transaction dictionaries
 
-# Populate database with random data for testing
-def populate_db():
-    conn = sqlite3.connect("school_meal_system.db")
-    cursor = conn.cursor()
-    names = ["Alice", "Bob", "Charlie", "David", "Eva"]
-    for name in names:
-        cursor.execute("INSERT INTO students (name, balance) VALUES (?, ?)", (name, random.uniform(50, 200)))
-    conn.commit()
 
-    cursor.execute("SELECT id FROM students")
-    student_ids = [row[0] for row in cursor.fetchall()]
-    for _ in range(20):
-        student_id = random.choice(student_ids)
-        amount = round(random.uniform(5, 20), 2)
-        txn_type = random.choice(["deposit", "purchase"])
-        if txn_type == "deposit":
-            cursor.execute("UPDATE students SET balance = balance + ? WHERE id = ?", (amount, student_id))
-        else:
-            cursor.execute("UPDATE students SET balance = balance - ? WHERE id = ?", (amount, student_id))
-        cursor.execute("INSERT INTO transactions (student_id, amount, type) VALUES (?, ?, ?)", (student_id, amount, txn_type))
-    conn.commit()
-    conn.close()
+# --- Helper Functions ---
+def deposit_funds(student_id, amount, payment_method, transaction_id):
+    """Processes deposits, updates balance, and logs transactions."""
+    if student_id in student_data:
+        student_data[student_id]["card_balance"] += amount
+        transaction_history.append({
+            "student_id": student_id,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "amount": amount,
+            "payment_method": payment_method,
+            "transaction_id": transaction_id
+        })
+        st.success(
+            f"Deposit successful! New balance for {student_data[student_id]['name']} is ${student_data[student_id]['card_balance']:.2f}"
+        )
+    else:
+        st.error("Student not found.")
 
-# Add student to database
-def add_student(name):
-    conn = sqlite3.connect("school_meal_system.db")
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO students (name) VALUES (?)", (name,))
-    conn.commit()
-    conn.close()
 
-# Get student details
-def get_student(name_or_id):
-    conn = sqlite3.connect("school_meal_system.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM students WHERE name = ? OR id = ?", (name_or_id, name_or_id))
-    student = cursor.fetchone()
-    conn.close()
-    return student
+# --- PayTabs Configuration ---
+profile_id = "YOUR_PROFILE_ID"  # Replace with your actual Profile ID
+server_key = "YOUR_SERVER_KEY"  # Replace with your actual Server Key
+paytabs_api_url = "https://secure.paytabs.sa/payment/request"
 
-# Update student balance
-def update_balance(student_id, amount, transaction_type):
-    conn = sqlite3.connect("school_meal_system.db")
-    cursor = conn.cursor()
-    cursor.execute("UPDATE students SET balance = balance + ? WHERE id = ?", (amount, student_id))
-    cursor.execute("INSERT INTO transactions (student_id, amount, type) VALUES (?, ?, ?)", (student_id, amount, transaction_type))
-    conn.commit()
-    conn.close()
+# --- Streamlit App ---
+st.title("School NFC Payment System Simulation")
 
-# Get transaction history
-def get_transactions(student_id):
-    conn = sqlite3.connect("school_meal_system.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM transactions WHERE student_id = ? ORDER BY timestamp DESC", (student_id,))
-    transactions = cursor.fetchall()
-    conn.close()
-    return transactions
+# --- NFC Card Simulation ---
+st.header("NFC Card Reader")
+nfc_input = st.text_input("Scan NFC Card (Enter Student ID):")
 
-# Initialize database
-init_db()
-populate_db()
+if nfc_input:
+    student_id = nfc_input
+    if student_id in student_data:
+        st.write(f"Student Name: {student_data[student_id]['name']}")
+        st.write(
+            f"Current Balance: ${student_data[student_id]['card_balance']:.2f}"
+        )
 
-# Streamlit UI
-st.title("School Meal Payment System")
+        # --- Deposit Form ---
+        st.subheader("Deposit Funds")
+        amount = st.number_input("Enter deposit amount:",
+                                 min_value=0.01,
+                                 step=0.01)
 
-menu = ["Parent Portal", "Admin Portal"]
-choice = st.sidebar.selectbox("Menu", menu)
+        if st.button("Deposit"):
+            try:
+                # Construct PayTabs payment request
+                headers = {"Authorization": server_key}
+                data = {
+                    "profile_id": profile_id,
+                    "tran_type": "sale",
+                    "tran_class": "ecom",
+                    "cart_id":
+                    f"cart_{student_id}_{datetime.now().timestamp()}",
+                    "cart_description": "School Fees",
+                    "cart_currency": "SAR",
+                    "cart_amount": amount,
+                    "customer_details": {
+                        "name": student_data[student_id]['name'],
+                        "email": f"{student_id}@example.com",
+                        "phone": "1234567890",  # Replace with student's phone
+                        "street1":
+                        "Street Address 1",  # Replace with student's address
+                        "city": "City Name",  # Replace with student's city
+                        "state":
+                        "State Name",  # Replace with student's state
+                        "country": "SA",
+                        "zip": "12345"  # Replace with student's zip code
+                    },
+                    "shipping_details": {
+                        # ... (same as customer_details or omit if not needed)
+                    },
+                    "return":
+                    "YOUR_RETURN_URL",  # Replace with your actual return URL
+                    "callback":
+                    "YOUR_CALLBACK_URL"  # Replace with your actual callback URL
+                }
 
-if choice == "Parent Portal":
-    st.header("Parent Portal - Recharge Card")
-    student_input = st.text_input("Enter Student Name or ID")
-    amount = st.number_input("Recharge Amount", min_value=1.0, step=0.1)
+                response = requests.post(paytabs_api_url,
+                                         headers=headers,
+                                         json=data)
+                response.raise_for_status()
 
-    if st.button("Recharge"):
-        student = get_student(student_input)
-        if student:
-            student_id, student_name, balance = student
+                result = response.json()
 
-            # Mocking PayTabs payment request
-            payload = {
-                "profile_id": 116284,
-                "tran_type": "sale",
-                "tran_class": "ecom",
-                "cart_id": f"recharge_{student_id}",
-                "cart_description": "Card Recharge",
-                "cart_currency": "SAR",
-                "cart_amount": amount,
-                "return": "https://your-website.com/return",
-                "callback": "https://your-website.com/callback"
-            }
-            response = requests.post("https://secure.paytabs.sa/payment/request", json=payload)
-            data = response.json()
+                if "redirect_url" in result:
+                    payment_url = result["redirect_url"]
+                    st.write(f"Redirecting to PayTabs: {payment_url}")
 
-            if "redirect_url" in data:
-                st.success(f"Redirect to payment: {data['redirect_url']}")
-                update_balance(student_id, amount, "deposit")
-                st.success(f"Successfully recharged {amount} SAR for {student_name}. New balance: {balance + amount:.2f} SAR")
-            else:
-                st.error("Payment failed. Please try again.")
-        else:
-            st.error("Student not found. Please check the name or ID.")
+                    # --- Redirect the user ---
+                    st.markdown(
+                        f'<meta http-equiv="refresh" content="0;URL={payment_url}">',
+                        unsafe_allow_html=True)
 
-elif choice == "Admin Portal":
-    st.header("Admin Portal")
-    sub_menu = ["Add Student", "View Students", "View Transactions"]
-    admin_choice = st.sidebar.radio("Admin Options", sub_menu)
+                    # --- (In production, handle the callback to confirm payment) ---
 
-    if admin_choice == "Add Student":
-        st.subheader("Add a New Student")
-        student_name = st.text_input("Enter Student Name")
-        if st.button("Add Student"):
-            add_student(student_name)
-            st.success(f"Student {student_name} added successfully.")
+                else:
+                    st.error(f"PayTabs error: {result.get('message')}")
+                    st.write(f"Full PayTabs response: {result}")
 
-    elif admin_choice == "View Students":
-        st.subheader("List of Students")
-        conn = sqlite3.connect("school_meal_system.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM students")
-        students = cursor.fetchall()
-        conn.close()
+            except requests.exceptions.RequestException as e:
+                st.error(f"Error processing payment: {e}")
+    else:
+        st.error("Student not found.")
 
-        for student in students:
-            st.write(f"ID: {student[0]}, Name: {student[1]}, Balance: {student[2]:.2f} SAR")
-
-    elif admin_choice == "View Transactions":
-        st.subheader("Transaction History")
-        student_input = st.text_input("Enter Student Name or ID")
-        if st.button("View Transactions"):
-            student = get_student(student_input)
-            if student:
-                transactions = get_transactions(student[0])
-                for txn in transactions:
-                    st.write(f"{txn[4]} - {'Deposit' if txn[3] == 'deposit' else 'Purchase'}: {txn[2]:.2f} SAR")
-            else:
-                st.error("Student not found. Please check the name or ID.")
+# --- Transaction History ---
+st.header("Transaction History")
+if transaction_history:
+    st.dataframe(pd.DataFrame(transaction_history))
+else:
+    st.write("No transactions yet.")
