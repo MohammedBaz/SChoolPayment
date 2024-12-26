@@ -32,8 +32,8 @@ def deposit_funds(student_id, amount, payment_method, transaction_id):
 
 
 # --- PayTabs Configuration ---
-profile_id = "YOUR_PROFILE_ID"  # Replace with your actual Profile ID
-server_key = "YOUR_SERVER_KEY"  # Replace with your actual Server Key
+profile_id = st.secrets["profile_id"]  # Replace with your actual Profile ID
+server_key = st.secrets["server_key"]  # Replace with your actual Server Key
 paytabs_api_url = "https://secure.paytabs.sa/payment/request"
 
 # --- Streamlit App ---
