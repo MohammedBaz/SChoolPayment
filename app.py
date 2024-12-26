@@ -1,4 +1,5 @@
 import streamlit as st
+from paytabs_sdk import PayTabs
 import pandas as pd  # For data handling
 
 # --- Data Storage (In-memory for simulation) ---
@@ -24,6 +25,9 @@ def deposit_funds(student_id, amount, payment_method):
     else:
         st.error("Student not found.")
 
+# --- PayTabs Configuration ---
+paytabs = PayTabs(profile_id=116284, server_key="SGJNKHLWZ2-JKJTRKW6NJ-2TR2KRD29K")  # Replace with your actual keys
+
 # --- Streamlit App ---
 st.title("School NFC Payment System Simulation")
 
@@ -40,9 +44,25 @@ if nfc_input:
         # --- Deposit Form ---
         st.subheader("Deposit Funds")
         amount = st.number_input("Enter deposit amount:", min_value=0.01, step=0.01)
-        payment_method = st.radio("Payment Method:", ["Credit Card", "Debit Card"])
+
         if st.button("Deposit"):
-            deposit_funds(student_id, amount, payment_method)
+            try:
+                # Construct PayTabs payment request (refer to PayTabs docs)
+                response = paytabs.create_pay_page(
+                    amount=amount,
+                    currency="SAR",
+                    # ... other required parameters ...
+                )
+
+                if response.success:
+                    # Redirect user to PayTabs payment page or handle response
+                    st.write("Redirecting to PayTabs...")
+                    # ... (You'll need to handle the redirection here) ...
+                else:
+                    st.error(f"PayTabs error: {response.message}")
+
+            except Exception as e:
+                st.error(f"Error processing payment: {e}")
     else:
         st.error("Student not found.")
 
