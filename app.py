@@ -87,20 +87,27 @@ if nfc_input:
                 response.raise_for_status()
 
                 result = response.json()
-                if result.get("response_code") == "4012":
+
+                # --- Enhanced Error Handling ---
+                if "response_code" not in result:
+                    st.error(
+                        "Invalid response from PayTabs (missing response_code)"
+                    )
+                elif result["response_code"] == "4012":
                     payment_url = result.get("payment_url")
                     transaction_id = result.get(
                         "tran_ref")  # Get the transaction ID
                     st.write(f"Redirecting to PayTabs: {payment_url}")
 
                     # --- Simulate successful payment (remove this in production) ---
-                    # In a real app, you would redirect the user to payment_url
-                    # and use webhooks to handle payment confirmation
                     deposit_funds(student_id, amount, "PayTabs",
                                   transaction_id)
 
                 else:
-                    st.error(f"PayTabs error: {result.get('result')}")
+                    error_message = result.get("result",
+                                              "Unknown PayTabs error")
+                    st.error(f"PayTabs error: {error_message}")
+                    st.write(f"Full PayTabs response: {result}")
 
             except requests.exceptions.RequestException as e:
                 st.error(f"Error processing payment: {e}")
