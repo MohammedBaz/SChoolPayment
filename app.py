@@ -91,10 +91,19 @@ if nfc_input:
                     "YOUR_CALLBACK_URL"  # Replace with your actual callback URL
                 }
 
+                # --- Debugging: Print request headers and data ---
+                st.write("Request Headers:", headers)
+                st.write("Request Data:", data)
+
                 response = requests.post(paytabs_api_url,
                                          headers=headers,
                                          json=data)
-                response.raise_for_status()
+
+                # --- Debugging: Print response status code and content ---
+                st.write("Response Status Code:", response.status_code)
+                st.write("Response Content:", response.text)
+
+                response.raise_for_status()  # Raise an exception for bad status codes
 
                 result = response.json()
 
