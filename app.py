@@ -2,6 +2,7 @@ import streamlit as st
 import sqlite3
 import requests
 from datetime import datetime
+import random
 
 # Database setup
 def init_db():
@@ -18,6 +19,29 @@ def init_db():
                         type TEXT NOT NULL,
                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY(student_id) REFERENCES students(id))''')
+    conn.commit()
+    conn.close()
+
+# Populate database with random data for testing
+def populate_db():
+    conn = sqlite3.connect("school_meal_system.db")
+    cursor = conn.cursor()
+    names = ["Alice", "Bob", "Charlie", "David", "Eva"]
+    for name in names:
+        cursor.execute("INSERT INTO students (name, balance) VALUES (?, ?)", (name, random.uniform(50, 200)))
+    conn.commit()
+
+    cursor.execute("SELECT id FROM students")
+    student_ids = [row[0] for row in cursor.fetchall()]
+    for _ in range(20):
+        student_id = random.choice(student_ids)
+        amount = round(random.uniform(5, 20), 2)
+        txn_type = random.choice(["deposit", "purchase"])
+        if txn_type == "deposit":
+            cursor.execute("UPDATE students SET balance = balance + ? WHERE id = ?", (amount, student_id))
+        else:
+            cursor.execute("UPDATE students SET balance = balance - ? WHERE id = ?", (amount, student_id))
+        cursor.execute("INSERT INTO transactions (student_id, amount, type) VALUES (?, ?, ?)", (student_id, amount, txn_type))
     conn.commit()
     conn.close()
 
@@ -58,6 +82,7 @@ def get_transactions(student_id):
 
 # Initialize database
 init_db()
+populate_db()
 
 # Streamlit UI
 st.title("School Meal Payment System")
