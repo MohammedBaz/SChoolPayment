@@ -34,7 +34,7 @@ def deposit_funds(student_id, amount, payment_method, transaction_id):
 # --- PayTabs Configuration ---
 profile_id = 116284  # Replace with your actual Profile ID
 server_key = "SHJNKHLWML-JKJTRNZZTZ-229Z299DDM"  # Replace with your actual Server Key
-paytabs_api_url = "https://secure.paytabs.sa/payment/request"
+paytabs_api_url = "https://secure.paytabs.sa/payment/link/create"  # Updated endpoint for PayLinks
 
 # --- Streamlit App ---
 st.title("School NFC Payment System Simulation")
@@ -59,36 +59,14 @@ if nfc_input:
 
         if st.button("Deposit"):
             try:
-                # Construct PayTabs payment request
+                # Construct PayTabs payment request (for PayLinks)
                 headers = {"Authorization": server_key}
                 data = {
                     "profile_id": profile_id,
-                    "tran_type": "sale",
-                    "tran_class": "ecom",
-                    "cart_id":
-                    f"cart_{student_id}_{datetime.now().timestamp()}",
-                    "cart_description": "School Fees",
+                    "link_title": f"Payment for {student_data[student_id]['name']}",
                     "cart_currency": "SAR",
                     "cart_amount": amount,
-                    "customer_details": {
-                        "name": student_data[student_id]['name'],
-                        "email": f"{student_id}@example.com",
-                        "phone": "1234567890",  # Replace with student's phone
-                        "street1":
-                        "Street Address 1",  # Replace with student's address
-                        "city": "City Name",  # Replace with student's city
-                        "state":
-                        "State Name",  # Replace with student's state
-                        "country": "SA",
-                        "zip": "12345"  # Replace with student's zip code
-                    },
-                    "shipping_details": {
-                        # ... (same as customer_details or omit if not needed)
-                    },
-                    "return":
-                    "YOUR_RETURN_URL",  # Replace with your actual return URL
-                    "callback":
-                    "YOUR_CALLBACK_URL"  # Replace with your actual callback URL
+                    # ... add any other optional parameters you need ...
                 }
 
                 # --- Debugging: Print request headers and data ---
@@ -103,12 +81,12 @@ if nfc_input:
                 st.write("Response Status Code:", response.status_code)
                 st.write("Response Content:", response.text)
 
-                response.raise_for_status()  # Raise an exception for bad status codes
+                response.raise_for_status()
 
                 result = response.json()
 
-                if "redirect_url" in result:
-                    payment_url = result["redirect_url"]
+                if "link_url" in result:
+                    payment_url = result["link_url"]
                     st.write(f"Redirecting to PayTabs: {payment_url}")
 
                     # --- Redirect the user ---
